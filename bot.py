@@ -44,11 +44,14 @@ class CustomPeriodicCallback(PeriodicCallback):
         else:
             start = False
             is_reset = False
-            #обработка
 
+            #обработка
+            print(message['text'])
             filename = str(uuid.uuid4())
+            print(filename)
             tmp = tempfile.TemporaryDirectory()
-            video_url = get_video_url(message.text)
+            video_url = get_video_url(message['text'])
+
             video_saver(video_url, filename, tmp)
 
             self.response_queue.put({
@@ -122,7 +125,7 @@ class AppTeleBot(TeleBot, object):
             # Отправка итоговых результатов
 
             #вывод результата
-            type_check = type_checking(message)
+            type_check = type_checking(message['chat_id'])
             text_caption = '\n'
             text_caption += 'Скачано в @ttvideoaudiobot \n'
 
@@ -151,109 +154,104 @@ class AppTeleBot(TeleBot, object):
 
 
 # --------------- ОСНОВНОЙ БОТ --------------- №
-def main():
-  token = '1938640806:AAFYU_HR_piFkrecqx_91vwbrwTnCMR08Xo'
-  request_queue = Queue(maxsize=0) # очередь запросов
-  response_queue = Queue(maxsize=0) # очередь результатов
+print("#----------------------- СТАРТ -----------------------#")
+token = '1939154692:AAEWu2LLMTeEJ9uMJZta3TG-XoQghFULp0w'
+request_queue = Queue(maxsize=0) # очередь запросов
+response_queue = Queue(maxsize=0) # очередь результатов
 
-  #инициализация бота
-  bot = AppTeleBot(token, request_queue, response_queue)
+#инициализация бота
+bot = AppTeleBot(token, request_queue, response_queue)
+
+#команда старт
+@bot.message_handler(commands=['start','help'])  
+def start_command(message):  
+
+  user_checkin(message)
+
+  text_hi = 'Привет😊\n'
+  text_hi += 'Я бот, который может сохранить видео из тиктока С ВОДЯНЫМ знаком \n'
+  text_hi += 'Также я умею извлекать из видео аудио дорожку\n'
+  text_hi += '\n'
+  text_hi += 'Чтобы скачать, отправьте мне ссылку на видео\n'
+  text_hi += '\n'
+  text_hi += '*По умолчанию* скачивается *ТОЛЬКО* видео \n'
+  text_hi += 'Нажмите /setup, чтобы изменить\n'
+
+  bot.send_message(message.chat.id, text_hi, parse_mode='MarkdownV2')
+  # my_thread = threading.Thread(target = start_command, args = (1,), daemon = True).start()
+
+#команда setup
+@bot.message_handler(commands=['setup'])  
+def setup_command(message):
+
+  user_checkin(message)
+
+  text_setup_begin = "Выберите, что хотите скачивать: \n"
+
+  keyboard = types.InlineKeyboardMarkup()
+
+  button_1 = types.InlineKeyboardButton(text="Только видео", callback_data='1')
+  keyboard.add(button_1)
+  button_2 = types.InlineKeyboardButton(text="Только аудио", callback_data='2')
+  keyboard.add(button_2)
+  button_3 = types.InlineKeyboardButton(text="Аудио и видео", callback_data='0')
+  keyboard.add(button_3)
+
+  #keyboard.add(types.InlineKeyboardButton(text=r"@{0}".format(buttons), url=r"t.me/{0}".format(buttons)))
+  bot.send_message(message.chat.id, text_setup_begin, reply_markup= keyboard)
+
+  # my_thread = threading.Thread(target = setup_command, args = (1,), daemon = True).start()
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_inline(call):
+  if call.data == '0':
+    type_check = '0'
+    type_changing(call, type_check)
+
+  elif call.data == '1':
+    type_check = '1'
+    type_changing(call, type_check)
+
+  elif call.data == '2':
+    type_check = '2'
+    type_changing(call, type_check)
+# my_thread = threading.Thread(target = callback_inline, args = (1,), daemon = True).start()
+
+#обработка видео
+@bot.message_handler(content_types=['text'])
+def handle(message):
 
 
-  #команда старт
-  @bot.message_handler(commands=['start','help'])  
-  def start_command(message):  
+  check = user_checkin(message)
+  
+  text_exception = 'Ошибка. В ссылке содержится ошибка или текст не является ссылкой на видео тикток \n'
+  text_exception += 'Проверьте и попробуйте еще раз\n'
 
-      user_checkin(message)
-
-      text_hi = 'Привет😊\n'
-      text_hi += 'Я бот, который может сохранить видео из тиктока С ВОДЯНЫМ знаком \n'
-      text_hi += 'Также я умею извлекать из видео аудио дорожку\n'
-      text_hi += '\n'
-      text_hi += 'Чтобы скачать, отправьте мне ссылку на видео\n'
-      text_hi += '\n'
-      text_hi += '*По умолчанию* скачивается *ТОЛЬКО* видео \n'
-      text_hi += 'Нажмите /setup, чтобы изменить\n'
-
-      bot.send_message(message.chat.id, text_hi, parse_mode='MarkdownV2')
-    # my_thread = threading.Thread(target = start_command, args = (1,), daemon = True).start()
-
-  #команда setup
-  @bot.message_handler(commands=['setup'])  
-  def setup_command(message):
-
-    user_checkin(message)
-
-    text_setup_begin = "Выберите, что хотите скачивать: \n"
-
-    keyboard = types.InlineKeyboardMarkup()
-
-    button_1 = types.InlineKeyboardButton(text="Только видео", callback_data='1')
-    keyboard.add(button_1)
-    button_2 = types.InlineKeyboardButton(text="Только аудио", callback_data='2')
-    keyboard.add(button_2)
-    button_3 = types.InlineKeyboardButton(text="Аудио и видео", callback_data='0')
-    keyboard.add(button_3)
-
-    #keyboard.add(types.InlineKeyboardButton(text=r"@{0}".format(buttons), url=r"t.me/{0}".format(buttons)))
-    bot.send_message(message.chat.id, text_setup_begin, reply_markup= keyboard)
-
-    # my_thread = threading.Thread(target = setup_command, args = (1,), daemon = True).start()
-
-  @bot.callback_query_handler(func=lambda call: True)
-  def callback_inline(call):
-    if call.data == '0':
-      type_check = '0'
-      type_changing(call, type_check)
-
-    elif call.data == '1':
-      type_check = '1'
-      type_changing(call, type_check)
-
-    elif call.data == '2':
-      type_check = '2'
-      type_changing(call, type_check)
-  # my_thread = threading.Thread(target = callback_inline, args = (1,), daemon = True).start()
-
-  #обработка видео
-  @bot.message_handler(content_types=['text'])
-  def handle(message):
-
-
-    check = user_checkin(message)
-    
-    text_exception = 'Ошибка. В ссылке содержится ошибка или текст не является ссылкой на видео тикток \n'
-    text_exception += 'Проверьте и попробуйте еще раз\n'
-    if not ("http" and "tiktok") in message.text:
-      print('ОСТАНОВЛЕН')
-      print(message.text)
-      bot.send_message(message.chat.id, text_exception)
-      return
-
+  if not ("http" and "tiktok") in message.text:
+    print('ОСТАНОВЛЕН')
     print(message.text)
+    bot.send_message(message.chat.id, text_exception)
+    return
 
-    print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+  print(message.text)
 
-    bot.send_message(message.chat.id, 'Скачиваю... Подождите чуть-чуть')
+  print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+
+  bot.send_message(message.chat.id, 'Скачиваю... Подождите чуть-чуть')
 
 
-    if check:
+  if check:
 
-      bot.request_queue.put({message})
+    bot.request_queue.put({
 
-    else:
-      output = 'Ошибка бота. Обратитесь к администратору'
-      bot.reply_to(message.chat.id, output)
-   
+      'text': message.text,
+      'chat_id': message.chat.id
+      })
 
-  ioloop = tornado.ioloop.IOLoop.instance()
-  BotPeriodicCallback(bot, 1000, ioloop).start()
-  CustomPeriodicCallback(request_queue, response_queue, 1000, ioloop).start()
-  ioloop.start()
-
-if __name__ == "__main__":
-    main()
-
+  else:
+    output = 'Ошибка бота. Обратитесь к администратору'
+    bot.reply_to(message.chat.id, output)
+  
 
 
 def user_checkin(message):
@@ -301,22 +299,13 @@ def get_video_url(url):
 
 
 def video_saver(url, filename, tmp):
-  print('BEFORE')
-  print(url)
-  #use_selenium=True, executablePath = r"/root/.wdm/drivers/chromedriver/linux64/93.0.4577.63/chromedriver"
-
   api = TikTokApi.get_instance()
-  print('kek')
-  #r1 = get_video(url)
   time.sleep(1)
   video_bytes = api.get_video_by_url(url)
   print('AFTER')
-  # with open("{}.mp4".format(str(filename)), 'wb') as output:
-  #   output.write(video_bytes)
 
   with open(os.path.join(tmp.name, "{}.mp4".format(str(filename))), 'wb') as output:
     output.write(video_bytes)
-  # my_thread = threading.Thread(target = video_saver(video_saver(url, filename, tmp), args = (1,), daemon = True).start()
 
   
 def get_audio(tmp, filename):
@@ -328,7 +317,8 @@ def get_audio(tmp, filename):
 
 
 def type_checking(message):
-  us_chat_id = message.chat.id
+
+  us_chat_id = message
 
   db = database()
   check = 0
@@ -350,22 +340,29 @@ def type_checking(message):
 
 def type_changing(message, type):
 
-  us_chat_id = message.from_user.id
+    us_chat_id = message.from_user.id
 
-  db = database()
-  check = 0
-  check = db.check_connection(check)
+    db = database()
+    check = 0
+    check = db.check_connection(check)
 
-  if check:
-    print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+    if check:
+      print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
 
-    #обработка пользователя
-    type_check = db.type_change(us_chat_id, type)
+      #обработка пользователя
+      type_check = db.type_change(us_chat_id, type)
 
-    bot.send_message(us_chat_id, 'Сохранено.')
+      bot.send_message(us_chat_id, 'Сохранено.')
 
-  else:
-    print('ОШИБКА С РАБОТОЙ БД')
+    else:
+      print('ОШИБКА С РАБОТОЙ БД')
 
-    type_check = 0
+      type_check = 0
 
+
+ioloop = tornado.ioloop.IOLoop.instance()
+BotPeriodicCallback(bot, 5000, ioloop).start()
+CustomPeriodicCallback(request_queue, response_queue, 1000, ioloop).start()
+ioloop.start()
+
+bot.polling(none_stop=True)
