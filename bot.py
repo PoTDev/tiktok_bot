@@ -14,6 +14,7 @@ from database import database
 from tornado.httpserver import HTTPServer
 from tornado.ioloop import PeriodicCallback, IOLoop
 from queue import Queue
+from queue import Empty
 
 
 
@@ -22,6 +23,7 @@ class CustomPeriodicCallback(PeriodicCallback):
     def __init__(self, request_queue, response_queue, callback_time, io_loop=None):
         if callback_time <= 0:
             raise ValueError("Periodic callback must have a positive callback_time")
+
         self.callback_time = callback_time
         self.io_loop = io_loop or IOLoop.current()
         self._running = False
@@ -37,7 +39,7 @@ class CustomPeriodicCallback(PeriodicCallback):
         try:
             #Получение из очереди и исключение
             message = self.request_queue.get_nowait()
-        except Queue.empty():
+        except Empty:
             pass
         else:
             start = False
@@ -76,6 +78,7 @@ class BotPeriodicCallback(PeriodicCallback):
     def __init__(self, bot, callback_time, io_loop=None):
         if callback_time <= 0:
             raise ValueError("Periodic callback must have a positive callback_time")
+
         self.callback_time = callback_time
         self.io_loop = io_loop or IOLoop.current()
         self._running = False
@@ -86,6 +89,7 @@ class BotPeriodicCallback(PeriodicCallback):
         #print 'bot_callback'
         if self.bot.skip_pending:
             self.bot.skip_pending = False
+
         updates = self.bot.get_updates(offset=(self.bot.last_update_id + 1), timeout=timeout)
         self.bot.process_new_updates(updates)
         self.bot.send_response_messages()
@@ -100,13 +104,10 @@ class BotPeriodicCallback(PeriodicCallback):
         finally:
             self._schedule_next()
 
-
-
 # Добавление к боту очередей запросов и результатов
 class AppTeleBot(TeleBot, object):
     def __init__(self, token, request_queue, response_queue, threaded=True, skip_pending=False):
         super(AppTeleBot, self).__init__(token, threaded=True, skip_pending=False)
-
 
         self.request_queue = request_queue
         self.response_queue = response_queue
@@ -115,7 +116,7 @@ class AppTeleBot(TeleBot, object):
     def send_response_messages(self):
         try:
             message = self.response_queue.get_nowait()
-        except Queue.empty():
+        except Empty:
             pass
         else:
             # Отправка итоговых результатов
@@ -133,7 +134,7 @@ class AppTeleBot(TeleBot, object):
 
             elif type_check == 1: # ТОЛЬКО ВИДЕ
               
-              self.send_video(message['chat_id'], open(os.path.joi(message['tmp'].name, "{}.mp4".format(str(message['filename']))), 'rb'), caption = text_caption)
+              self.send_video(message['chat_id'], open(os.path.join(message['tmp'].name, "{}.mp4".format(str(message['filename']))), 'rb'), caption = text_caption)
 
             elif type_check == 2: # ТОЛЬКО АУДИО
               
@@ -318,7 +319,6 @@ def video_saver(url, filename, tmp):
   # my_thread = threading.Thread(target = video_saver(video_saver(url, filename, tmp), args = (1,), daemon = True).start()
 
   
-
 def get_audio(tmp, filename):
 
   audioclip = AudioFileClip(os.path.join(tmp.name, "{0}.mp4".format(str(filename)))) 
