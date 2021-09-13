@@ -16,7 +16,7 @@ from database import database
 
 
 #инициализация бота
-token = '1939154692:AAFFY3EG7WYUToqGidyA_VD7NECN70sEulY'
+token = '1938640806:AAFYU_HR_piFkrecqx_91vwbrwTnCMR08Xo'
 bot = telebot.TeleBot(token)
 
 import collections
