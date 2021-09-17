@@ -1,5 +1,12 @@
+import json
+
+import nest_asyncio
+
+
+import asyncio
+
 import telebot
-import tempfile	
+import tempfile
 import uuid
 import urllib.request
 import time
@@ -10,16 +17,22 @@ from telebot import TeleBot
 from telebot import types
 from TikTokApi import TikTokApi
 from moviepy.editor import *
+
+import shaz
 from database import database
 from tornado.httpserver import HTTPServer
 from tornado.ioloop import PeriodicCallback, IOLoop
 from queue import Queue
 from queue import Empty
-#from videosaver import videosaver
 
+from shazamio import Shazam
+
+# from videosaver import videosaver
 
 
 # периодический запуск синхронных задач по обработке задач в очереди запросов
+
+
 class CustomPeriodicCallback(PeriodicCallback):
     def __init__(self, bot, request_queue, response_queue, callback_time, io_loop=None):
         if callback_time <= 0:
@@ -38,7 +51,7 @@ class CustomPeriodicCallback(PeriodicCallback):
     # взяли из очереди задачу, обработали, записали результат и сказали что задача выполенена
     def queue_callback(self):
         try:
-            #Получение из очереди и исключение
+            # Получение из очереди и исключение
             message = self.request_queue.get_nowait()
         except Empty:
             pass
@@ -46,24 +59,29 @@ class CustomPeriodicCallback(PeriodicCallback):
             start = False
             is_reset = False
 
-            #обработка
+            # обработка
             print(message['text'])
             filename = str(uuid.uuid4())
             print(filename)
             tmp = tempfile.TemporaryDirectory()
             video_url = self.bot.get_video_url(message['text'])
             print(video_url)
+
+            # check_video = self.bot.video_type_checking(message['chat_id'])
+            # videosaver.video_saver(video_url, filename, tmp)
+            # print(check_video)
+            # if check_video == 0:
             videosaver.video_saver(video_url, filename, tmp)
+            # elif check_video == 1:
+            #     videosavernowatermark.video_saves_no_watermark(video_url, filename, tmp)
 
             self.response_queue.put({
-              'chat_id': message['chat_id'],
-              'filename': filename,
-              'tmp': tmp
-                })
-
+                'chat_id': message['chat_id'],
+                'filename': filename,
+                'tmp': tmp
+            })
 
             self.request_queue.task_done()
-
 
     def _run(self):
         if not self._running:
@@ -74,7 +92,6 @@ class CustomPeriodicCallback(PeriodicCallback):
             self.io_loop.handle_callback_exception(self.queue_callback)
         finally:
             self._schedule_next()
-
 
 
 # периодический запуск получения запросов с серверов Telegram и отправка ответов
@@ -90,7 +107,7 @@ class BotPeriodicCallback(PeriodicCallback):
         self.bot = bot
 
     def bot_callback(self, timeout=1):
-        #print 'bot_callback'
+        # print 'bot_callback'
         if self.bot.skip_pending:
             self.bot.skip_pending = False
 
@@ -108,23 +125,88 @@ class BotPeriodicCallback(PeriodicCallback):
         finally:
             self._schedule_next()
 
+
 class videosaver:
     def video_saver(url, filename, tmp):
-      # self.url = url
-      # self.filename = filename
-      # self.tmp = tmp
-      api = TikTokApi.get_instance()
-      video_bytes = api.get_video_by_url(url)
-      print('AFTER')
+        # self.url = url
+        # self.filename = filename
+        # self.tmp = tmp
+        api = TikTokApi.get_instance()
+        video_bytes = api.get_video_by_url(url)
+        print('AFTER')
 
-      with open(os.path.join(tmp.name, "{}.mp4".format(str(filename))), 'wb') as output:
-        output.write(video_bytes)
+        with open(os.path.join(tmp.name, "{}.mp4".format(str(filename))), 'wb') as output:
+            output.write(video_bytes)
 
-      threading.Thread(target = videosaver.video_saver, args=(url, filename, tmp))
+        th1 = threading.Thread(target=videosaver.video_saver, args=(url, filename, tmp))
+
+    # def video_saves_no_watermark(url, filename, tmp):
+    #     api = TikTokApi.get_instance()
+    #     video_bytes = api.get_video_no_watermark(url, return_bytes=1)
+    #
+    #     with open(os.path.join(tmp.name, "{}.mp4".format(str(filename))), 'wb') as output:
+    #         output.write(video_bytes)
+    #
+    #     th2 = threading.Thread(target=videosaver.video_saves_no_watermark, args=(url, filename, tmp))
+
+class audiosaver:
+    def create_audio(tmp, filename):
+
+        audioclip = AudioFileClip(os.path.join(tmp.name, "{0}.mp4".format(str(filename))))
+        audioclip.write_audiofile(os.path.join(tmp.name, "{0}.mp3".format(str(filename))))
+
+        #return open(os.path.join(tmp.name, "{0}.mp3".format(str(filename))), 'rb')
+
+class shazam_check:
+    def __init__(self, tmp, filename):
+        self.loop = asyncio.get_event_loop()
+        self.tmp = tmp
+        self.filename = filename
+        print('ИНИТ', filename)
+        kek1 = shazam_check.do_shazam(self)
+        print(kek1)
+        # th2 = threading.Thread(target=shazam_check.__init__, args=(self, tmp, filename))
+        # th2.start()
+
+    def do_shazam(self):
+        # th2 = threading.Thread(target=shazam_check.do_shazam, args=())
+        # th2.start()
+        return self.loop.run_until_complete(self.__async__do_shazam(self.tmp, self.filename))
+
+    async def __async__do_shazam(self, tmp, filename):
+        print('В ШАЗАМЕ')
+        print(filename)
+        shazam = Shazam()
+        # out = await shazam.recognize_song(audiosaver.get_audio(filename))
+        out = await shazam.recognize_song(os.path.join(tmp.name, "{0}.mp3".format(str(filename))))
+        # out_result = out['track']['subtitle'] + ' ' + '-' + ' ' + out['track']['title']
+        print(out)
+
+        if not out['matches']:
+            out_result = 'Нет результатов. Shazam не смог распознать аудио'
+            with open(os.path.join(tmp.name, "{0}.txt".format(str(filename))), 'w') as output:
+                output.write(out_result)
+        else:
+
+            out_result = out['track']['subtitle'] + ' ' + '-' + ' ' + out['track']['title']
+
+            with open(os.path.join(tmp.name, "{0}.txt".format(str(filename))), 'w') as output:
+                output.write(json.dumps(out_result))
+        
 
 
+        # if not out['matches']:
+        #     out_result = out['track']['subtitle'] + ' ' + '-' + ' ' + out['track']['title']
+        #
+        #     with open(os.path.join(tmp.name, "{0}.txt".format(str(filename))), 'w') as output:
+        #         output.write(json.dumps(out_result))
+        # else:
+        #
+        #     out_result = 'Нет результатов. Shazam не смог распознать аудио'
+        #     with open(os.path.join(tmp.name, "{0}.txt".format(str(filename))), 'w') as output:
+        #         output.write(out_result)
 
-# Добавление к боту очередей запросов и результатов
+# # Добавление к боту очередей запросов и результатов
 class AppTeleBot(TeleBot, object):
 
     def __init__(self, token, request_queue, response_queue, threaded=True, skip_pending=False):
@@ -132,7 +214,6 @@ class AppTeleBot(TeleBot, object):
 
         self.request_queue = request_queue
         self.response_queue = response_queue
-
 
     # Отправка всех обработанных данных из очереди результатов
     def send_response_messages(self):
@@ -143,62 +224,85 @@ class AppTeleBot(TeleBot, object):
         else:
             # Отправка итоговых результатов
 
-            #вывод результата
+            # вывод результата
             type_check = self.type_checking(message['chat_id'])
             text_caption = '\n'
             text_caption += 'Скачано в @ttvideoaudiobot \n'
 
-            if type_check == 0: # АУДИО И ВИДЕО
+            if type_check == 0:  # АУДИО И ВИДЕО
 
-              audio = self.get_audio(message['tmp'], message['filename'])
-              self.send_video(message['chat_id'], open(os.path.join(message['tmp'].name, "{}.mp4".format(str(message['filename']))), 'rb'), caption = text_caption)
-              self.send_audio(message['chat_id'], audio)
+                self.send_video(message['chat_id'],
+                                open(os.path.join(message['tmp'].name, "{}.mp4".format(str(message['filename']))),
+                                     'rb'), caption=text_caption)
 
-            elif type_check == 1: # ТОЛЬКО ВИДЕ
-              
-              self.send_video(message['chat_id'], open(os.path.join(message['tmp'].name, "{}.mp4".format(str(message['filename']))), 'rb'), caption = text_caption)
+                audiosaver.create_audio(message['tmp'], message['filename'])
+                audio = open(os.path.join(message['tmp'].name, "{0}.mp3".format(str(message['filename']))), 'rb')
+                self.send_audio(message['chat_id'], audio)
 
-            elif type_check == 2: # ТОЛЬКО АУДИО
-              
-              audio = self.get_audio(message['tmp'], message['filename'])
-              self.send_audio(message['chat_id'], audio)
+                if self.audio_type_checking(message['chat_id']) == 1:
+                    shazam_check(message['tmp'], message['filename'])
+                    text = open(os.path.join(message['tmp'].name, "{0}.txt".format(str(message['filename']))), 'r').read()
+                    self.send_message(message['chat_id'], text)
+
+
+
+            elif type_check == 1:  # ТОЛЬКО ВИДЕО
+
+                self.send_video(message['chat_id'],
+                                open(os.path.join(message['tmp'].name, "{}.mp4".format(str(message['filename']))),
+                                     'rb'), caption=text_caption)
+
+                if self.audio_type_checking(message['chat_id']) == 1:
+                    audiosaver.create_audio(message['tmp'], message['filename'])
+                    shazam_check(message['tmp'], message['filename'])
+                    text = open(os.path.join(message['tmp'].name, "{0}.txt".format(str(message['filename']))), 'r').read()
+                    self.send_message(message['chat_id'], text)
+
+            elif type_check == 2:  # ТОЛЬКО АУДИО
+
+                audiosaver.create_audio(message['tmp'], message['filename'])
+                audio = open(os.path.join(message['tmp'].name, "{0}.mp3".format(str(message['filename']))), 'rb')
+                self.send_audio(message['chat_id'], audio)
+
+                if self.audio_type_checking(message['chat_id']) == 1:
+                    shazam_check(message['tmp'], message['filename'])
+                    text = open(os.path.join(message['tmp'].name, "{0}.txt".format(str(message['filename']))), 'r').read()
+                    print(text)
+                    self.send_message(message['chat_id'], text)
 
             message['tmp'].cleanup()
-            
-            #Пометка что задание выполнено
+
+            # Пометка что задание выполнено
             self.response_queue.task_done()
 
     # СТАРЫЕ ФУНКЦИИ
     def user_checkin(self, message):
-      #вызов проверки пользователя
-      us_id = message.from_user.id
-      username = message.from_user.username
-      us_chat_id = message.chat.id
+        # вызов проверки пользователя
+        us_id = message.from_user.id
+        username = message.from_user.username
+        us_chat_id = message.chat.id
 
+        db = database()
+        check = 0
+        check = db.check_connection(check)
 
-      db = database()
-      check = 0
-      check = db.check_connection(check)
+        if check:
 
-      if check:
+            print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+            # обработка пользователя
+            check_user = db.user_identity(us_id, us_chat_id, username)
 
-          print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
-          #обработка пользователя
-          check_user = db.user_identity(us_id, us_chat_id, username)
+            result = 1
 
-          result = 1
+        else:
 
-      else:
+            print('ОШИБКА С РАБОТОЙ БД')
 
-          print('ОШИБКА С РАБОТОЙ БД')
+            result = 0
 
-          result = 0
+        return result
 
-      return result
-
-    
-      # multiprocessing.Process(target=user_checkin, args=(message,)) 
-
+        # multiprocessing.Process(target=user_checkin, args=(message,))
 
     def get_video_url(self, url):
 
@@ -206,174 +310,329 @@ class AppTeleBot(TeleBot, object):
         user_agent = {'User-Agent': 'Mozilla/5.0 (platform; rv:geckoversion) Gecko/geckotrail Firefox/firefoxversion'}
         req = urllib.request.Request(url, headers=user_agent)
         webpage = urllib.request.urlopen(req)
-        r1= webpage.geturl()
+        r1 = webpage.geturl()
 
         return r1
-
-      
-    def get_audio(self, tmp, filename):
-
-      audioclip = AudioFileClip(os.path.join(tmp.name, "{0}.mp4".format(str(filename)))) 
-      audioclip.write_audiofile(os.path.join(tmp.name, "{0}.mp3".format(str(filename))))
-
-      return open(os.path.join(tmp.name, "{0}.mp3".format(str(filename))), 'rb')
 
 
     def type_checking(self, message):
 
-      us_chat_id = message
+        us_chat_id = message
 
-      db = database()
-      check = 0
-      check = db.check_connection(check)
+        db = database()
+        check = 0
+        check = db.check_connection(check)
 
-      if check:
-        print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+        if check:
+            print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
 
-        #обработка пользователя
-        type_check = db.type_check(us_chat_id)
+            # обработка пользователя
+            type_check = db.type_check(us_chat_id)
 
-      else:
-        print('ОШИБКА С РАБОТОЙ БД')
+        else:
+            print('ОШИБКА С РАБОТОЙ БД')
 
-        type_check = 0
+            type_check = 0
 
-      return type_check
-
+        return type_check
 
     def type_changing(self, message, type):
 
-      us_chat_id = message.from_user.id
+        us_chat_id = message.from_user.id
 
-      db = database()
-      check = 0
-      check = db.check_connection(check)
+        db = database()
+        check = 0
+        check = db.check_connection(check)
 
-      if check:
-        print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+        if check:
+            print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
 
-        #обработка пользователя
-        type_check = db.type_change(us_chat_id, type)
+            # обработка пользователя
+            type_check = db.type_change(us_chat_id, type)
 
-        bot.send_message(us_chat_id, 'Сохранено.')
+            self.send_message(us_chat_id, 'Сохранено.')
 
-      else:
-        print('ОШИБКА С РАБОТОЙ БД')
+        else:
+            print('ОШИБКА С РАБОТОЙ БД')
 
-        type_check = 0
+            type_check = 0
 
+    def video_type_checking(self, message):
+        us_chat_id = message
+        db = database()
+        check = 0
+        check = db.check_connection(check)
+        if check:
+            print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
 
+            # обработка пользователя
+            type_check = db.video_type_check(us_chat_id)
 
+        else:
+            print('ОШИБКА С РАБОТОЙ БД')
+
+            type_check = 0
+
+        return type_check
+
+    def video_type_changing(self, message, type):
+        print('ВНУТРИ ВИДЕО')
+        us_chat_id = message.from_user.id
+
+        db = database()
+        check = 0
+        check = db.check_connection(check)
+
+        if check:
+            print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+
+            # обработка пользователя
+            type_check = db.video_type_change(us_chat_id, type)
+
+            self.send_message(us_chat_id, 'Сохранено.')
+
+        else:
+            print('ОШИБКА С РАБОТОЙ БД')
+
+            type_check = 0
+
+    def audio_type_checking(self, message):
+
+        us_chat_id = message
+        db = database()
+        check = 0
+        check = db.check_connection(check)
+
+        if check:
+            print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+
+            # обработка пользователя
+            type_check = db.audio_type_check(us_chat_id)
+
+        else:
+            print('ОШИБКА С РАБОТОЙ БД')
+
+            type_check = 0
+
+        return type_check
+
+    def audio_type_changing(self, message, type):
+
+        us_chat_id = message.from_user.id
+
+        db = database()
+        check = 0
+        check = db.check_connection(check)
+
+        if check:
+            print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+
+            # обработка пользователя
+            type_check = db.audio_type_change(us_chat_id, type)
+
+            self.send_message(us_chat_id, 'Сохранено.')
+
+        else:
+            print('ОШИБКА С РАБОТОЙ БД')
+
+            type_check = 0
 
 
 # --------------- ОСНОВНОЙ БОТ --------------- №
 def main():
+    print("#----------------------- СТАРТ -----------------------#")
+    token = '1939154692:AAG1-ttSXKu1MMZmKs3dFwozm47zTpGDDpY'
+    request_queue = Queue(maxsize=0)  # очередь запросов
+    response_queue = Queue(maxsize=0)  # очередь результатов
 
-  print("#----------------------- СТАРТ -----------------------#")
-  token = '1938640806:AAFuKQ8JWikmPtts5joNtn3aLzA6Gr7diAY'
-  request_queue = Queue(maxsize=0) # очередь запросов
-  response_queue = Queue(maxsize=0) # очередь результатов
+    # инициализация бота
+    bot = AppTeleBot(token, request_queue, response_queue)
 
-  #инициализация бота
-  bot = AppTeleBot(token, request_queue, response_queue)
+    # команда старт
+    @bot.message_handler(commands=['start', 'help'])
+    def start_command(message):
 
-  #команда старт
-  @bot.message_handler(commands=['start','help'])  
-  def start_command(message):  
+        bot.user_checkin(message)
 
-    bot.user_checkin(message)
+        text_hi = 'Привет😊\n'
+        text_hi += 'Я бот, который может сохранить видео из тиктока С ВОДЯНЫМ знаком \n'
+        text_hi += 'Также я умею извлекать из видео аудио дорожку\n'
+        text_hi += '\n'
+        text_hi += 'Чтобы скачать, отправьте мне ссылку на видео\n'
+        text_hi += '\n'
+        text_hi += '*По умолчанию* скачивается *ТОЛЬКО* видео \n'
+        text_hi += 'Нажмите /setup, чтобы изменить\n'
 
-    text_hi = 'Привет😊\n'
-    text_hi += 'Я бот, который может сохранить видео из тиктока С ВОДЯНЫМ знаком \n'
-    text_hi += 'Также я умею извлекать из видео аудио дорожку\n'
-    text_hi += '\n'
-    text_hi += 'Чтобы скачать, отправьте мне ссылку на видео\n'
-    text_hi += '\n'
-    text_hi += '*По умолчанию* скачивается *ТОЛЬКО* видео \n'
-    text_hi += 'Нажмите /setup, чтобы изменить\n'
+        bot.send_message(message.chat.id, text_hi, parse_mode='MarkdownV2')
 
-    bot.send_message(message.chat.id, text_hi, parse_mode='MarkdownV2')
-    # my_thread = threading.Thread(target = start_command, args = (1,), daemon = True).start()
+    # команда setup
+    @bot.message_handler(commands=['setup'])
+    def setup_command(message):
 
-  #команда setup
-  @bot.message_handler(commands=['setup'])  
-  def setup_command(message):
+        bot.user_checkin(message)
 
-    bot.user_checkin(message)
+        bot.send_message(message.chat.id, "Выберите, что хотите скачивать: \n", reply_markup=start_keyboard(message))
 
-    text_setup_begin = "Выберите, что хотите скачивать: \n"
+    def start_keyboard(message):
+        # text_setup_begin = "Выберите, что хотите скачивать: \n"
+        type_of_type = bot.type_checking(message.chat.id)
+        # Виды клав
+        type_text_just_video = 'Только видео'
+        type_text_just_audio = 'Только аудио'
+        type_text_all = 'Аудио и видео'
+        if type_of_type == 1:
+            type_text_just_video = type_text_just_video + ' ' + '(сейчас)'
+        elif type_of_type == 2:
+            type_text_just_audio = type_text_just_audio + ' ' + '(сейчас)'
+        elif type_of_type == 0:
+            type_text_all = type_text_all + ' ' + '(сейчас)'
 
-    keyboard = types.InlineKeyboardMarkup()
+        keyboard = types.InlineKeyboardMarkup()
 
-    button_1 = types.InlineKeyboardButton(text="Только видео", callback_data='1')
-    keyboard.add(button_1)
-    button_2 = types.InlineKeyboardButton(text="Только аудио", callback_data='2')
-    keyboard.add(button_2)
-    button_3 = types.InlineKeyboardButton(text="Аудио и видео", callback_data='0')
-    keyboard.add(button_3)
+        button_1 = types.InlineKeyboardButton(text=type_text_just_video, callback_data='1')
+        keyboard.add(button_1)
 
-    #keyboard.add(types.InlineKeyboardButton(text=r"@{0}".format(buttons), url=r"t.me/{0}".format(buttons)))
-    bot.send_message(message.chat.id, text_setup_begin, reply_markup= keyboard)
+        button_2 = types.InlineKeyboardButton(text=type_text_just_audio, callback_data='2')
+        keyboard.add(button_2)
 
-    # my_thread = threading.Thread(target = setup_command, args = (1,), daemon = True).start()
+        button_3 = types.InlineKeyboardButton(text=type_text_all, callback_data='0')
+        keyboard.add(button_3)
 
-  @bot.callback_query_handler(func=lambda call: True)
-  def callback_inline(call):
-    if call.data == '0':
-      type_check = '0'
-      bot.type_changing(call, type_check)
+        button_4 = types.InlineKeyboardButton(text="🔧Доп.настройки🔧", callback_data='setup')
+        keyboard.add(button_4)
 
-    elif call.data == '1':
-      type_check = '1'
-      bot.type_changing(call, type_check)
+        return keyboard
 
-    elif call.data == '2':
-      type_check = '2'
-      bot.type_changing(call, type_check)
-  # my_thread = threading.Thread(target = callback_inline, args = (1,), daemon = True).start()
+    @bot.callback_query_handler(func=lambda call: call.data == '0')
+    def callback_inline0(call):
+        type_check = '0'
+        bot.type_changing(call, type_check)
+        bot.edit_message_text("Выберите, что хотите скачивать: \n", call.message.chat.id, call.message.message_id,
+                              reply_markup=start_keyboard(call.message))
 
-  #обработка видео
-  @bot.message_handler(content_types=['text'])
-  def handle(message):
+    @bot.callback_query_handler(func=lambda call: call.data == '1')
+    def callback_inline1(call):
+        type_check = '1'
+        bot.type_changing(call, type_check)
+        bot.edit_message_text("Выберите, что хотите скачивать: \n", call.message.chat.id, call.message.message_id,
+                              reply_markup=start_keyboard(call.message))
 
+    @bot.callback_query_handler(func=lambda call: call.data == '2')
+    def callback_inline2(call):
+        type_check = '2'
+        bot.type_changing(call, type_check)
+        bot.edit_message_text("Выберите, что хотите скачивать: \n", call.message.chat.id, call.message.message_id,
+                              reply_markup=start_keyboard(call.message))
 
-    check = bot.user_checkin(message)
-    
-    text_exception = 'Ошибка. В ссылке содержится ошибка или текст не является ссылкой на видео тикток \n'
-    text_exception += 'Проверьте и попробуйте еще раз\n'
+    @bot.callback_query_handler(func=lambda call: call.data == 'setup')
+    def callback_inline_setup(call):
+        # text_with_watermark = "ON вотермарку"
+        # text_out_watermark = "OFF вотермарку"
 
-    if not ("http" and "tiktok") in message.text:
-      print('ОСТАНОВЛЕН')
-      print(message.text)
-      bot.send_message(message.chat.id, text_exception)
-      return
+        # request_video_check = bot.video_type_checking(call.message.chat.id)
+        request_audio_check = bot.audio_type_checking(call.message.chat.id)
 
-    print(message.text)
+        keyboard1 = types.InlineKeyboardMarkup()
 
-    print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+        # if request_video_check == 0:
+        #     but_1 = types.InlineKeyboardButton(text=text_with_watermark, callback_data='1_1')
+        #     keyboard1.add(but_1)
+        # elif request_video_check == 1:
+        #     but_1_1 = types.InlineKeyboardButton(text=text_out_watermark, callback_data='1_2')
+        #     keyboard1.add(but_1_1)
 
-    bot.send_message(message.chat.id, 'Скачиваю... Подождите чуть-чуть')
+        if request_audio_check == 0:
+            bun_2 = types.InlineKeyboardButton(text='ON shazam', callback_data='2_1')
+            keyboard1.add(bun_2)
+        elif request_audio_check == 1:
+            bun_2 = types.InlineKeyboardButton(text='OFF shazam', callback_data='2_2')
+            keyboard1.add(bun_2)
 
+        bun_3 = types.InlineKeyboardButton(text='Назад', callback_data='back')
+        keyboard1.add(bun_3)
 
-    if check:
+        bot.edit_message_text('Дополнительные настройки:', call.message.chat.id, call.message.message_id,
+                              reply_markup=keyboard1)
 
-      bot.request_queue.put({
+    @bot.callback_query_handler(func=lambda call: call.data == '1_1')
+    def callback1_1(call):
+        type_check = '1'
+        bot.video_type_changing(call, type_check)
+        callback_inline_setup(call)
 
-        'text': message.text,
-        'chat_id': message.chat.id
-        })
+    @bot.callback_query_handler(func=lambda call: call.data == '1_2')
+    def callback1_2(call):
+        type_check = '0'
+        bot.video_type_changing(call, type_check)
+        callback_inline_setup(call)
 
-    else:
-      output = 'Ошибка бота. Обратитесь к администратору'
-      bot.reply_to(message.chat.id, output)
-    
+    @bot.callback_query_handler(func=lambda call: call.data == '2_1')
+    def callback2_1(call):
+        type_check = '1'
+        bot.audio_type_changing(call, type_check)
+        callback_inline_setup(call)
 
-  ioloop = tornado.ioloop.IOLoop.instance()
-  BotPeriodicCallback(bot, 5000, ioloop).start()
-  CustomPeriodicCallback(bot, request_queue, response_queue, 1000, ioloop).start()
-  ioloop.start()
+    @bot.callback_query_handler(func=lambda call: call.data == '2_2')
+    def callback2_2(call):
+        type_check = '0'
+        bot.audio_type_changing(call, type_check)
+        callback_inline_setup(call)
 
-#bot.polling(none_stop=True)
+    @bot.callback_query_handler(func=lambda call: call.data == 'back')
+    def callback2_2(call):
+        print('в БЭКЕ')
+        bot.edit_message_text("Выберите, что хотите скачивать: \n", call.message.chat.id, call.message.message_id,
+                              reply_markup=start_keyboard(call.message))
+
+    # обработка видео
+    @bot.message_handler(content_types=['text'])
+    def handle(message):
+
+        check = bot.user_checkin(message)
+
+        text_exception = 'Ошибка. В ссылке содержится ошибка или текст не является ссылкой на *видео* тикток \n'
+        text_exception += 'Проверьте и попробуйте еще раз\n'
+
+        if ("tiktok") in message.text:
+            if ("vm.tiktok") in message.text:
+                print('да')
+            elif ("video") in message.text:
+                print('да')
+            else:
+                print('ОСТАНОВЛЕН')
+                print(message.text)
+                bot.send_message(message.chat.id, text_exception, parse_mode='Markdown')
+                return
+        else:
+            print('ОСТАНОВЛЕН')
+            print(message.text)
+            bot.send_message(message.chat.id, text_exception, parse_mode='Markdown')
+            return
+
+        print(message.text)
+
+        print('СОЕДИНЕНИЕ С БАЗОЙ ДАННОЙ УСТАНОВЛЕНО')
+
+        bot.send_message(message.chat.id, 'Скачиваю... Подождите чуть-чуть')
+
+        if check:
+
+            bot.request_queue.put({
+
+                'text': message.text,
+                'chat_id': message.chat.id
+            })
+
+        else:
+            output = 'Ошибка бота. Обратитесь к администратору'
+            bot.reply_to(message.chat.id, output)
+
+    nest_asyncio.apply()
+    ioloop = tornado.ioloop.IOLoop.instance()
+    BotPeriodicCallback(bot, 1000, ioloop).start()
+    CustomPeriodicCallback(bot, request_queue, response_queue, 1000, ioloop).start()
+    ioloop.start()
+
 
 if __name__ == "__main__":
     main()
