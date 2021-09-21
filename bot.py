@@ -2,14 +2,11 @@ import json
 
 import nest_asyncio
 
-
 import asyncio
 
-import telebot
 import tempfile
 import uuid
 import urllib.request
-import time
 import tornado
 import threading
 
@@ -18,14 +15,13 @@ from telebot import types
 from TikTokApi import TikTokApi
 from moviepy.editor import *
 
-import shaz
 from database import database
-from tornado.httpserver import HTTPServer
 from tornado.ioloop import PeriodicCallback, IOLoop
 from queue import Queue
 from queue import Empty
 
 from shazamio import Shazam
+
 
 # from videosaver import videosaver
 
@@ -149,13 +145,14 @@ class videosaver:
     #
     #     th2 = threading.Thread(target=videosaver.video_saves_no_watermark, args=(url, filename, tmp))
 
+
 class audiosaver:
     def create_audio(tmp, filename):
-
         audioclip = AudioFileClip(os.path.join(tmp.name, "{0}.mp4".format(str(filename))))
         audioclip.write_audiofile(os.path.join(tmp.name, "{0}.mp3".format(str(filename))))
 
-        #return open(os.path.join(tmp.name, "{0}.mp3".format(str(filename))), 'rb')
+        # return open(os.path.join(tmp.name, "{0}.mp3".format(str(filename))), 'rb')
+
 
 class shazam_check:
     def __init__(self, tmp, filename):
@@ -192,21 +189,10 @@ class shazam_check:
 
             with open(os.path.join(tmp.name, "{0}.txt".format(str(filename))), 'w') as output:
                 output.write(json.dumps(out_result))
-        
+
+            # # Добавление к боту очередей запросов и результатов
 
 
-        # if not out['matches']:
-        #     out_result = out['track']['subtitle'] + ' ' + '-' + ' ' + out['track']['title']
-        #
-        #     with open(os.path.join(tmp.name, "{0}.txt".format(str(filename))), 'w') as output:
-        #         output.write(json.dumps(out_result))
-        # else:
-        #
-        #     out_result = 'Нет результатов. Shazam не смог распознать аудио'
-        #     with open(os.path.join(tmp.name, "{0}.txt".format(str(filename))), 'w') as output:
-        #         output.write(out_result)
-
-# # Добавление к боту очередей запросов и результатов
 class AppTeleBot(TeleBot, object):
 
     def __init__(self, token, request_queue, response_queue, threaded=True, skip_pending=False):
@@ -241,10 +227,9 @@ class AppTeleBot(TeleBot, object):
 
                 if self.audio_type_checking(message['chat_id']) == 1:
                     shazam_check(message['tmp'], message['filename'])
-                    text = open(os.path.join(message['tmp'].name, "{0}.txt".format(str(message['filename']))), 'r').read()
+                    text = open(os.path.join(message['tmp'].name, "{0}.txt".format(str(message['filename']))),
+                                'r').read()
                     self.send_message(message['chat_id'], text)
-
-
 
             elif type_check == 1:  # ТОЛЬКО ВИДЕО
 
@@ -255,7 +240,8 @@ class AppTeleBot(TeleBot, object):
                 if self.audio_type_checking(message['chat_id']) == 1:
                     audiosaver.create_audio(message['tmp'], message['filename'])
                     shazam_check(message['tmp'], message['filename'])
-                    text = open(os.path.join(message['tmp'].name, "{0}.txt".format(str(message['filename']))), 'r').read()
+                    text = open(os.path.join(message['tmp'].name, "{0}.txt".format(str(message['filename']))),
+                                'r').read()
                     self.send_message(message['chat_id'], text)
 
             elif type_check == 2:  # ТОЛЬКО АУДИО
@@ -266,7 +252,8 @@ class AppTeleBot(TeleBot, object):
 
                 if self.audio_type_checking(message['chat_id']) == 1:
                     shazam_check(message['tmp'], message['filename'])
-                    text = open(os.path.join(message['tmp'].name, "{0}.txt".format(str(message['filename']))), 'r').read()
+                    text = open(os.path.join(message['tmp'].name, "{0}.txt".format(str(message['filename']))),
+                                'r').read()
                     print(text)
                     self.send_message(message['chat_id'], text)
 
@@ -313,7 +300,6 @@ class AppTeleBot(TeleBot, object):
         r1 = webpage.geturl()
 
         return r1
-
 
     def type_checking(self, message):
 
@@ -455,12 +441,16 @@ def main():
         bot.user_checkin(message)
 
         text_hi = 'Привет😊\n'
-        text_hi += 'Я бот, который может сохранить видео из тиктока С ВОДЯНЫМ знаком \n'
-        text_hi += 'Также я умею извлекать из видео аудио дорожку\n'
+        text_hi += 'Я бот, который умеет работать с видео из тиктока\n'
         text_hi += '\n'
-        text_hi += 'Чтобы скачать, отправьте мне ссылку на видео\n'
+        text_hi += 'Я могу: \n'
+        text_hi += ' ✔ _сохранить_ видео c *водяным* знаком\n'
+        text_hi += ' ✔ _извлечь_ из видео аудио дорожку\n'
+        text_hi += ' ✔ _узнать_ название и автора музыки из видео\n'
         text_hi += '\n'
-        text_hi += '*По умолчанию* скачивается *ТОЛЬКО* видео \n'
+        text_hi += '*Чтобы скачать, отправьте мне ссылку на видео*\n'
+        text_hi += '\n'
+        text_hi += '*По умолчанию* скачивается *ТОЛЬКО* видео, а Shazam *отключен*\n'
         text_hi += 'Нажмите /setup, чтобы изменить\n'
 
         bot.send_message(message.chat.id, text_hi, parse_mode='MarkdownV2')
@@ -591,6 +581,9 @@ def main():
         check = bot.user_checkin(message)
 
         text_exception = 'Ошибка. В ссылке содержится ошибка или текст не является ссылкой на *видео* тикток \n'
+        text_exception += 'Пример ссылок:\n'
+        text_exception += 'https://vm.tiktok.com/asdfgssd/\n'
+        text_exception += 'https://www.tiktok.com/@username/video/123456789abcdefg\n'
         text_exception += 'Проверьте и попробуйте еще раз\n'
 
         if ("tiktok") in message.text:
@@ -601,12 +594,12 @@ def main():
             else:
                 print('ОСТАНОВЛЕН')
                 print(message.text)
-                bot.send_message(message.chat.id, text_exception, parse_mode='Markdown')
+                bot.send_message(message.chat.id, text_exception, parse_mode='Markdown', disable_web_page_preview=True)
                 return
         else:
             print('ОСТАНОВЛЕН')
             print(message.text)
-            bot.send_message(message.chat.id, text_exception, parse_mode='Markdown')
+            bot.send_message(message.chat.id, text_exception, parse_mode='Markdown', disable_web_page_preview=True)
             return
 
         print(message.text)
