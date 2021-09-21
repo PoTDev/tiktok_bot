@@ -7,7 +7,6 @@ import urllib
 import uuid
 
 from aiogram import Bot, Dispatcher, executor, types, utils
-
 from ddgram import database
 from TikTokApi import TikTokApi
 
