@@ -1,6 +1,9 @@
 import random
 import time
 import string
+from asyncio import run
+from asyncinit import asyncinit
+
 import requests
 import logging
 from threading import Thread
@@ -9,29 +12,31 @@ import datetime
 import random
 import json
 from urllib.parse import splitquery, parse_qs, parse_qsl
-
+import asyncio
 
 # Import Detection From Stealth
 from .stealth import stealth
 from .get_acrawler import get_acrawler, get_tt_params_script
-from playwright.sync_api import sync_playwright
+# from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 
 playwright = None
 
 
-def get_playwright():
+async def get_playwright():
     global playwright
     if playwright is None:
         try:
-            playwright = sync_playwright().start()
+            async with async_playwright() as playwright:
+                await run(playwright)
         except Exception as e:
             raise e
 
     return playwright
 
-
+@asyncinit
 class browser:
-    def __init__(
+    async def __init__(
         self,
         **kwargs,
     ):

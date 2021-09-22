@@ -10,8 +10,8 @@ from aiogram import Bot, Dispatcher, executor, types, utils
 # from aiogram.types import message
 
 from ddgram import database
-from TikTokApi import TikTokApi
-from playwright import async_playwright
+from mytiktokapi.tiktok import TikTokApi
+# from playwright import async_playwright
 
 class botsFunctions:
     async def user_checkin(message):
@@ -43,8 +43,8 @@ class botsFunctions:
 
 class videosaver:
     async def video_saver(url, filename):
-        api = TikTokApi.get_instance()
-        video_bytes = api.get_video_by_url(url)
+        api = await TikTokApi.get_instance()
+        video_bytes = await api.get_video_by_url(url)
         print('AFTER')
 
         with open(os.path.join("{}.mp4".format(str(filename))), 'wb') as output:
@@ -126,7 +126,7 @@ async def handle(message=types.Message):
         filename = str(uuid.uuid4())
 
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(videosaver.video_saver(r1, filename))
+        await loop.run_in_executor(await videosaver.video_saver(r1, filename))
 
         await message.answer_video(open(("{}.mp4".format(str(filename))), 'rb'))
 

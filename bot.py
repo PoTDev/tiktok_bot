@@ -54,7 +54,7 @@ class CustomPeriodicCallback(PeriodicCallback):
         else:
             start = False
             is_reset = False
-
+            print('Во ПЕРВОМ периодике')
             # обработка
             print(message['text'])
             filename = str(uuid.uuid4())
@@ -71,12 +71,15 @@ class CustomPeriodicCallback(PeriodicCallback):
             # elif check_video == 1:
             #     videosavernowatermark.video_saves_no_watermark(video_url, filename, tmp)
 
+            type_cheking = self.bot.type_checking(message['chat_id'])
+
             self.response_queue.put({
+                'type_cheking': type_cheking,
                 'chat_id': message['chat_id'],
                 'filename': filename,
                 'tmp': tmp
             })
-
+            print('Закончил работу с БД')
             self.request_queue.task_done()
 
     def _run(self):
@@ -103,22 +106,28 @@ class BotPeriodicCallback(PeriodicCallback):
         self.bot = bot
 
     def bot_callback(self, timeout=1):
-        # print 'bot_callback'
+        print('Во втором периодике')
         if self.bot.skip_pending:
             self.bot.skip_pending = False
-
+        print('перед апдейтс')
         updates = self.bot.get_updates(offset=(self.bot.last_update_id + 1), timeout=timeout)
+        print(updates)
         self.bot.process_new_updates(updates)
+        print('self.bot.process_new_updates(updates)')
         self.bot.send_response_messages()
+        print('send_response_messages()')
 
     def _run(self):
         if not self._running:
             return
         try:
+            print('try')
             return self.bot_callback()
         except Exception:
+            print('Exception')
             self.io_loop.handle_callback_exception(self.bot_callback)
         finally:
+            print('finally')
             self._schedule_next()
 
 
@@ -209,9 +218,9 @@ class AppTeleBot(TeleBot, object):
             pass
         else:
             # Отправка итоговых результатов
-
+            print('В РЕЗУЛЬТАТЕ')
             # вывод результата
-            type_check = self.type_checking(message['chat_id'])
+            type_check = message['type_cheking']
             text_caption = '\n'
             text_caption += 'Скачано в @ttvideoaudiobot \n'
 
@@ -427,7 +436,7 @@ class AppTeleBot(TeleBot, object):
 # --------------- ОСНОВНОЙ БОТ --------------- №
 def main():
     print("#----------------------- СТАРТ -----------------------#")
-    token = '1939154692:AAG1-ttSXKu1MMZmKs3dFwozm47zTpGDDpY'
+    token = '1938640806:AAFwTN4KbpRQF_X5nwPFvReE8DhztHDStjM'
     request_queue = Queue(maxsize=0)  # очередь запросов
     response_queue = Queue(maxsize=0)  # очередь результатов
 
@@ -450,7 +459,7 @@ def main():
         text_hi += '\n'
         text_hi += '*Чтобы скачать, отправьте мне ссылку на видео*\n'
         text_hi += '\n'
-        text_hi += '*По умолчанию* скачивается *ТОЛЬКО* видео, а Shazam *отключен*\n'
+        text_hi += '*По умолчанию* скачивается *ТОЛЬКО* видео, а распознавание музыки *отключено*\n'
         text_hi += 'Нажмите /setup, чтобы изменить\n'
 
         bot.send_message(message.chat.id, text_hi, parse_mode='MarkdownV2')
@@ -532,10 +541,10 @@ def main():
         #     keyboard1.add(but_1_1)
 
         if request_audio_check == 0:
-            bun_2 = types.InlineKeyboardButton(text='ON shazam', callback_data='2_1')
+            bun_2 = types.InlineKeyboardButton(text='ВКЛючить распозн-е', callback_data='2_1')
             keyboard1.add(bun_2)
         elif request_audio_check == 1:
-            bun_2 = types.InlineKeyboardButton(text='OFF shazam', callback_data='2_2')
+            bun_2 = types.InlineKeyboardButton(text='ВЫКЛючить распозн-е', callback_data='2_2')
             keyboard1.add(bun_2)
 
         bun_3 = types.InlineKeyboardButton(text='Назад', callback_data='back')
@@ -622,8 +631,10 @@ def main():
 
     nest_asyncio.apply()
     ioloop = tornado.ioloop.IOLoop.instance()
-    BotPeriodicCallback(bot, 1000, ioloop).start()
+
+    BotPeriodicCallback(bot, 100, ioloop).start()
     CustomPeriodicCallback(bot, request_queue, response_queue, 1000, ioloop).start()
+
     ioloop.start()
 
 
