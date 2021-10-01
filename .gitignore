@@ -1,24 +1,5 @@
 /не нужное
 /__pycache__
-
-database.py
-test.py
-не нужное/text.py
-не нужное/videoque.py
-bot copy.py
-bot copy 2.py
-не нужное/videosaver.py
-
-
-bot_oldv1.5.py
-lang/ru.py
-tiktok_no_watermark_scrapper-main/download.py
-tiktok_no_watermark_scrapper-main/ssstiktok.py
-.idea/misc.xml
-.idea/modules.xml
-.idea/tiktok_bot.iml
-bot_oldv1.5.py
-.idea/.gitignore
-.idea/vcs.xml
-.idea/inspectionProfiles/profiles_settings.xml
-tiktok_no_watermark_scrapper-main/__pycache__/download.cpython-39.pyc
+/.idea
+.gitignore
+bot/.env

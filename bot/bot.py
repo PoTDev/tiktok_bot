@@ -9,6 +9,7 @@ import uuid
 import urllib.request
 import tornado
 import threading
+import os
 
 from telebot import TeleBot
 from telebot import types
@@ -21,6 +22,9 @@ from queue import Queue
 from queue import Empty
 
 from shazamio import Shazam
+
+from dotenv import load_dotenv
+from os.path import join, dirname
 
 
 # from videosaver import videosaver
@@ -436,7 +440,11 @@ class AppTeleBot(TeleBot, object):
 # --------------- ОСНОВНОЙ БОТ --------------- №
 def main():
     print("#----------------------- СТАРТ -----------------------#")
-    token = '1938640806:AAFwTN4KbpRQF_X5nwPFvReE8DhztHDStjM'
+
+    dotenv_path = join(dirname(__file__), '.env')
+    load_dotenv(dotenv_path)
+
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
     request_queue = Queue(maxsize=0)  # очередь запросов
     response_queue = Queue(maxsize=0)  # очередь результатов
 
