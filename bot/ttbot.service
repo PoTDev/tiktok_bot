@@ -6,8 +6,8 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/usr/local/bin/ttbot/botsystem/
-ExecStart=/usr/bin/python3 /usr/local/bin/ttbot/bot.py
+WorkingDirectory=
+ExecStart=/usr/bin/python3 
 RestartSec=10
 Restart=always
  
